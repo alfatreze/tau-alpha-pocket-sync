@@ -4,7 +4,7 @@
 
 A small plugin for [Pocket Sync](https://github.com/neil-morrison44/pocket-sync) and pupdate that looks after the music side of a card used with **TAU**, the music player core for the Analogue Pocket ([Tau-Alpha](https://github.com/alfatreze/Tau-Alpha)).
 
-> **Status: first release, early.** It has three functions: **Check the card** (read only), **Rebuild the library** and **Make album covers** (both show a plan first and write only after you say yes). See [`docs/PLAN.md`](docs/PLAN.md) for what comes next. Tested on disposable cards under the plugin host; not tried yet in the real Pocket Sync or pupdate.
+> **Status: first release, early.** It has three functions: **Check the card** (read only), **Rebuild the library** (the library and the album covers, in one step) and **Make album covers only** (both show a plan first and write only after you say yes). See [`docs/PLAN.md`](docs/PLAN.md) for what comes next. Tested on disposable cards under the plugin host; not tried yet in the real Pocket Sync or pupdate.
 
 ## What "Check the card" tells you
 * whether TAU is installed (and which version) and whether `Assets/tau/common` exists;
@@ -16,6 +16,8 @@ A small plugin for [Pocket Sync](https://github.com/neil-morrison44/pocket-sync)
 * macOS stubs (`._*`, `.DS_Store`).
 
 ## What "Rebuild the library" does
+It makes the missing album covers (see below) and then writes the library, in one step with one plan.
+
 It reads the tags of the MP3 and FLAC files under `Assets/tau/common` and writes `tau-library.tdb` (the index TAU lists) and, when names need it, the name sidecar (`tau-names.json` and `tau-names.bin`, the original text behind the Pocket-safe names). It shows the plan first (tracks, albums, playlists, files it must leave out) and asks. The old library stays until the new one has been written, read back and checked. **Your music files are never renamed, moved or deleted**; a file the Pocket cannot open (a character outside code page 437, or a path over 200 bytes) is left out and listed. The index and the sidecar are made by [Tau Omega](https://github.com/alfatreze/Tau-Omega)'s `tau-core`, so the plugin and Tau Omega write the same format.
 
 ## What "Make album covers" does

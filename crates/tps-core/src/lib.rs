@@ -4,6 +4,7 @@
 //! tested natively and then used unchanged inside the WebAssembly plugin. The plugin crate only turns it into menus.
 
 pub mod covers;
+pub mod library;
 pub mod rebuild;
 pub mod report;
 pub mod scan;

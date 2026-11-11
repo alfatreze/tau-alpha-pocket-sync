@@ -115,9 +115,8 @@ fn start_shows_the_menu() {
         [
             "Check the card (read only)",
             "Rebuild the library (shows the plan first)",
-            "Make album covers (shows the plan first)",
-            "Get Tau Omega (the full tool)",
-            "Exit"
+            "Make album covers only (shows the plan first)",
+            "Get Tau Omega (the full tool)"
         ]
     );
     assert!(
@@ -188,10 +187,8 @@ fn omega_item_opens_the_releases_page() {
 }
 
 #[test]
-fn exit_and_both_kill_encodings_end_the_run() {
+fn both_kill_encodings_end_the_run() {
     let mut run = load(|_| {});
-    assert_eq!(answer(&mut run, "Exit"), "\"Exit\"");
-    assert!(run.log.lock().unwrap().contains("Tau Omega does the rest"));
     for kill in ["\"Kill\"", "{\"Kill\":{}}"] {
         let out: String = run.plugin.call("handle_response", kill).unwrap();
         assert_eq!(out, "\"Exit\"", "{kill}");
@@ -271,7 +268,7 @@ fn rebuild_shows_a_plan_and_writes_nothing_until_confirmed() {
 fn confirming_writes_the_same_library_as_the_native_build() {
     let mut run = load(music);
     answer(&mut run, REBUILD);
-    answer_to(&mut run, "confirm", "Write the library now");
+    answer_to(&mut run, "confirm", "Write the library and covers now");
     let log = run.log.lock().unwrap().clone();
     assert!(log.contains("Library written: 3 tracks, 2 albums"), "{log}");
     let wasm = fs::read(run._card.path().join(INDEX)).expect("the plugin wrote the index");
@@ -324,7 +321,7 @@ fn music_with_covers(card: &Path) {
     .unwrap();
 }
 
-const COVERS: &str = "Make album covers (shows the plan first)";
+const COVERS: &str = "Make album covers only (shows the plan first)";
 const SIDECAR: &str = "Assets/tau/common/Album One/tau-art/cover_128.pal256.timg";
 
 #[test]
@@ -354,4 +351,28 @@ fn confirming_makes_the_same_cover_as_the_native_build() {
     music_with_covers(native.path());
     tps_core::covers::run(native.path(), &mut |_, _| {}).unwrap();
     assert_eq!(wasm, fs::read(native.path().join(SIDECAR)).unwrap());
+}
+
+#[test]
+fn rebuild_includes_the_covers_and_matches_the_native_build() {
+    let mut run = load(music_with_covers);
+    answer(&mut run, REBUILD);
+    let plan_log = run.log.lock().unwrap().clone();
+    assert!(
+        plan_log.contains("1 would get one"),
+        "the plan names the covers: {plan_log}"
+    );
+    answer_to(&mut run, "confirm", "Write the library and covers now");
+    let log = run.log.lock().unwrap().clone();
+    assert!(log.contains("Library written: 3 tracks"), "{log}");
+    assert!(log.contains("Cover files written: 1"), "{log}");
+    let (wasm_cover, wasm_index) = (
+        fs::read(run._card.path().join(SIDECAR)).unwrap(),
+        fs::read(run._card.path().join(INDEX)).unwrap(),
+    );
+    let native = tempfile::tempdir().unwrap();
+    music_with_covers(native.path());
+    tps_core::library::run(native.path(), &mut |_, _| {}).unwrap();
+    assert_eq!(wasm_cover, fs::read(native.path().join(SIDECAR)).unwrap());
+    assert_eq!(wasm_index, fs::read(native.path().join(INDEX)).unwrap());
 }

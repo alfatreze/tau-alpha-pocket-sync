@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+- **Rebuild the library now also makes the album covers**: one plan, one confirmation; the covers are made first, then the library is written once. **Make album covers only** stays for when only the covers are missing.
+- The **Exit** item is gone (the host's window stays open until you close it).
+
 ## 0.1.0 (first release)
 - A plugin icon (`assets/plugin-icon.png`, a square crop of the TAU platform artwork), shown by the hosts from `logo_url`.
 - **Check the card** (read only): is TAU installed, how many tracks, albums and playlists it can see, whether the library index, the name sidecar and the album cover files are there, which files TAU cannot play, macOS stubs.

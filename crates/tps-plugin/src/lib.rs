@@ -3,7 +3,7 @@
 
 use extism_pdk::*;
 use serde::Serialize;
-use tps_core::{Limits, covers, rebuild, report, scan};
+use tps_core::{Limits, covers, library, report, scan};
 
 #[derive(Clone, Serialize, ToBytes)]
 #[encoding(Json)]
@@ -48,24 +48,17 @@ use host::{open, say};
 const CARD: &str = "pocket";
 const CHECK: &str = "Check the card (read only)";
 const REBUILD: &str = "Rebuild the library (shows the plan first)";
-const COVERS: &str = "Make album covers (shows the plan first)";
+const COVERS: &str = "Make album covers only (shows the plan first)";
 const WRITE_COVERS: &str = "Make the covers now";
-const WRITE: &str = "Write the library now";
+const WRITE: &str = "Write the library and covers now";
 const CANCEL: &str = "Cancel, write nothing";
 const OMEGA: &str = "Get Tau Omega (the full tool)";
-const EXIT: &str = "Exit";
 
 fn menu(query: &str) -> PluginMessage {
     PluginMessage::Choice {
         name: "main".into(),
         query: query.into(),
-        choices: vec![
-            CHECK.into(),
-            REBUILD.into(),
-            COVERS.into(),
-            OMEGA.into(),
-            EXIT.into(),
-        ],
+        choices: vec![CHECK.into(), REBUILD.into(), COVERS.into(), OMEGA.into()],
     }
 }
 
@@ -78,6 +71,7 @@ pub fn start() -> FnResult<PluginMessage> {
     Ok(menu("What do you want to do?"))
 }
 
+/// There is no Exit item: the host's window stays open until the user closes it, which sends the kill signal.
 /// The host sends `{"Answer":{"name":..,"value":..}}` or a kill signal (the string `"Kill"` or `{"Kill":{}}`; both are accepted).
 #[plugin_fn]
 pub fn handle_response(Json(msg): Json<serde_json::Value>) -> FnResult<PluginMessage> {
@@ -113,10 +107,6 @@ pub fn handle_response(Json(msg): Json<serde_json::Value>) -> FnResult<PluginMes
             open(report::TAU_OMEGA_URL)?;
             Ok(menu("Anything else?"))
         }
-        EXIT => {
-            say(report::OMEGA_NUDGE);
-            Ok(PluginMessage::Exit)
-        }
         _ => Ok(menu("What do you want to do?")),
     }
 }
@@ -129,13 +119,13 @@ fn confirm_menu() -> PluginMessage {
     }
 }
 
-/// Reads the tags and shows what a rebuild would do; nothing is written.
+/// Reads the tags and the folders and shows what a rebuild would do (the library and the album covers); nothing is written.
 fn rebuild_plan() -> PluginMessage {
-    say("Reading the music and its tags (nothing is written yet)...");
-    match rebuild::plan(std::path::Path::new(CARD)) {
+    say("Reading the music, its tags and the album folders (nothing is written yet)...");
+    match library::plan(std::path::Path::new(CARD)) {
         Ok(p) => {
-            say(&rebuild::render_plan(&p));
-            if p.tracks == 0 {
+            say(&library::render_plan(&p));
+            if p.library.tracks == 0 {
                 say(
                     "There is no playable track (MP3 or FLAC) to list, so there is nothing to write.",
                 );
@@ -151,16 +141,21 @@ fn rebuild_plan() -> PluginMessage {
     }
 }
 
-/// The answer to the confirmation: write the library, or leave everything as it is.
+/// The answer to the confirmation: make the covers and write the library, or leave everything as it is.
 fn confirmed(value: &str) -> PluginMessage {
     if value != WRITE {
         say("Nothing was written.");
         return menu("Anything else?");
     }
-    say("Writing the library. Please keep the card in place...");
-    match rebuild::run(std::path::Path::new(CARD)) {
+    say("Writing the covers and the library. Please keep the card in place...");
+    let mut progress = |done: usize, total: usize| {
+        if done == total || done % 10 == 0 {
+            say(&format!("  cover {done} of {total}"));
+        }
+    };
+    match library::run(std::path::Path::new(CARD), &mut progress) {
         Ok(d) => {
-            say(&rebuild::render_done(&d));
+            say(&library::render_done(&d));
             say("Eject the card from your computer before you take it out.");
             say(report::OMEGA_NUDGE);
         }
@@ -169,7 +164,6 @@ fn confirmed(value: &str) -> PluginMessage {
     menu("Anything else?")
 }
 
-/// Reads the folders and shows which albums would get a cover file; nothing is written.
 fn covers_plan() -> PluginMessage {
     say("Looking for albums without a cover file (nothing is written yet)...");
     match covers::plan(std::path::Path::new(CARD)) {

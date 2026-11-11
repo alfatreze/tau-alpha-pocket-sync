@@ -118,9 +118,12 @@ fn write_one(item: &tau_core::sync::ArtSidecarItem) -> Result<(), String> {
     })
 }
 
-/// Makes every missing cover sidecar, then rebuilds the library when there is one. `progress(done, total)` is called
-/// after each album. A cover that fails is listed and skipped; the others are still made.
-pub fn run(card: &Path, progress: &mut dyn FnMut(usize, usize)) -> Result<Done, Error> {
+/// Makes every missing cover sidecar and nothing else. `progress(done, total)` is called after each album. A cover that
+/// fails is listed and skipped; the others are still made. Returns how many were written and the albums that failed.
+pub fn write_all(
+    card: &Path,
+    progress: &mut dyn FnMut(usize, usize),
+) -> Result<(usize, Vec<(String, String)>), Error> {
     let root = media_root(card)?;
     let p = plan_cover_files(&root).map_err(|e| Error::Failed(e.to_string()))?;
     let total = p.items.len();
@@ -132,6 +135,14 @@ pub fn run(card: &Path, progress: &mut dyn FnMut(usize, usize)) -> Result<Done, 
         }
         progress(i + 1, total);
     }
+    Ok((written, failed))
+}
+
+/// Makes every missing cover sidecar, then rebuilds the library when there is one (the index records which albums
+/// have a cover file).
+pub fn run(card: &Path, progress: &mut dyn FnMut(usize, usize)) -> Result<Done, Error> {
+    let root = media_root(card)?;
+    let (written, failed) = write_all(card, progress)?;
     let library_tracks = if written > 0 && root.join(rebuild::INDEX_NAME).is_file() {
         Some(rebuild::run(card)?.tracks)
     } else {
