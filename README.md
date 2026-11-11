@@ -2,7 +2,7 @@
 
 A small plugin for [Pocket Sync](https://github.com/neil-morrison44/pocket-sync) and pupdate that looks after the music side of a card used with **TAU**, the music player core for the Analogue Pocket ([Tau-Alpha](https://github.com/alfatreze/Tau-Alpha)).
 
-> **Status: early.** Today it does one thing: **Check the card** (read only). The library rebuild and the cover and name sidecars are the next steps (see [`docs/PLAN.md`](docs/PLAN.md)). Nothing here writes to your card yet.
+> **Status: early, not released.** It has two functions: **Check the card** (read only) and **Rebuild the library** (shows a plan first and writes only after you say yes). The cover sidecars are the next step (see [`docs/PLAN.md`](docs/PLAN.md)). Tested on disposable cards under the plugin host; not tried yet in the real Pocket Sync or pupdate.
 
 ## What "Check the card" tells you
 * whether TAU is installed (and which version) and whether `Assets/tau/common` exists;
@@ -13,6 +13,9 @@ A small plugin for [Pocket Sync](https://github.com/neil-morrison44/pocket-sync)
 * files TAU cannot play (m4a, ogg, opus, wav, ...): listed and left alone;
 * macOS stubs (`._*`, `.DS_Store`).
 
+## What "Rebuild the library" does
+It reads the tags of the MP3 and FLAC files under `Assets/tau/common` and writes `tau-library.tdb` (the index TAU lists) and, when names need it, the name sidecar (`tau-names.json` and `tau-names.bin`, the original text behind the Pocket-safe names). It shows the plan first (tracks, albums, playlists, files it must leave out) and asks. The old library stays until the new one has been written, read back and checked. **Your music files are never renamed, moved or deleted**; a file the Pocket cannot open (a character outside code page 437, or a path over 200 bytes) is left out and listed. The index and the sidecar are made by [Tau Omega](https://github.com/alfatreze/Tau-Omega)'s `tau-core`, so the plugin and Tau Omega write the same format.
+
 ## Use it
 Releases are not published yet. When they are, add `https://github.com/alfatreze/tau-alpha-pocket-sync` as a plugin repository in Pocket Sync (Plugins), connect your card and run **TAU Library**. The same plugin format is meant to work in pupdate (not tested yet).
 
@@ -22,7 +25,7 @@ This plugin stays small on purpose (a plugin cannot run external tools). **[Tau 
 ## Build and test
 ```sh
 rustup target add wasm32-wasip1
-cargo test -p tps-core                                   # the card logic, natively
+cargo test -p tps-core                                   # the card logic and the golden comparison with tau_library.py, natively
 cargo build -p tps-plugin --target wasm32-wasip1 --release
 cargo test -p tps-host-test                              # runs the real plugin.wasm under Extism with a disposable card
 ```
@@ -33,7 +36,7 @@ The release needs two files, `plugin.wasm` (the build above) and `plugin.json` (
 * `crates/tps-plugin`: the WebAssembly plugin: the plugin message protocol and the menus, nothing else. The two host calls are the only `unsafe` code.
 * `crates/tps-host-test`: loads the compiled plugin in Extism with the two mounts the real hosts give it (the card as `pocket/`, a private folder as `host/`) and drives it like a host does.
 
-The plugin depends on nothing outside this repository (no code is shared by path with Tau-Alpha or Tau Omega).
+The plugin shares no code with Tau-Alpha by path. It depends on Tau Omega's `tau-core` as an ordinary library pinned to a tag (see `Cargo.toml`).
 
 ## Licence
 MIT, see [`LICENSE`](LICENSE) and [`NOTICE.md`](NOTICE.md).

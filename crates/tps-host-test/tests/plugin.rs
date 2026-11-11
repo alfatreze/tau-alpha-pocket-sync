@@ -88,7 +88,11 @@ fn load(fill: impl Fn(&Path)) -> Run {
 }
 
 fn answer(run: &mut Run, value: &str) -> String {
-    let msg = serde_json::json!({"Answer": {"name": "main", "value": value}}).to_string();
+    answer_to(run, "main", value)
+}
+
+fn answer_to(run: &mut Run, name: &str, value: &str) -> String {
+    let msg = serde_json::json!({"Answer": {"name": name, "value": value}}).to_string();
     run.plugin
         .call::<&str, String>("handle_response", &msg)
         .expect("handle_response")
@@ -110,11 +114,17 @@ fn start_shows_the_menu() {
         choices,
         [
             "Check the card (read only)",
+            "Rebuild the library (shows the plan first)",
             "Get Tau Omega (the full tool)",
             "Exit"
         ]
     );
-    assert!(run.log.lock().unwrap().contains("writes nothing"));
+    assert!(
+        run.log
+            .lock()
+            .unwrap()
+            .contains("writes only when you say so")
+    );
 }
 
 #[test]
@@ -191,4 +201,102 @@ fn exit_and_both_kill_encodings_end_the_run() {
 fn an_unknown_answer_shows_the_menu_again() {
     let mut run = load(|_| {});
     assert!(answer(&mut run, "nonsense").contains("Choice"));
+}
+
+// ---- Rebuild the library ----
+
+fn syncsafe(n: usize) -> [u8; 4] {
+    [
+        (n >> 21) as u8 & 127,
+        (n >> 14) as u8 & 127,
+        (n >> 7) as u8 & 127,
+        n as u8 & 127,
+    ]
+}
+
+/// A tiny valid MP3: an ID3v2.3 tag and silent frames.
+fn mp3(title: &str, artist: &str, album: &str) -> Vec<u8> {
+    let mut frames = Vec::new();
+    for (id, t) in [("TIT2", title), ("TPE1", artist), ("TALB", album)] {
+        let mut body = vec![3u8];
+        body.extend_from_slice(t.as_bytes());
+        frames.extend_from_slice(id.as_bytes());
+        frames.extend_from_slice(&syncsafe(body.len()));
+        frames.extend_from_slice(&[0, 0]);
+        frames.extend(body);
+    }
+    let mut out = b"ID3\x03\x00\x00".to_vec();
+    out.extend_from_slice(&syncsafe(frames.len()));
+    out.extend(frames);
+    for _ in 0..40 {
+        out.extend_from_slice(&[0xff, 0xfb, 0x90, 0x64]);
+        out.extend(std::iter::repeat_n(0u8, 413));
+    }
+    out
+}
+
+fn music(card: &Path) {
+    for (dir, n, title, artist) in [
+        ("Album One", 2, "Song", "Ann"),
+        ("Album Two", 1, "Tune", "Bob"),
+    ] {
+        for i in 1..=n {
+            let p = card.join(format!("Assets/tau/common/{dir}/{i:02} t.mp3"));
+            fs::create_dir_all(p.parent().unwrap()).unwrap();
+            fs::write(p, mp3(&format!("{title} {i}"), artist, dir)).unwrap();
+        }
+    }
+}
+
+const INDEX: &str = "Assets/tau/common/tau-library.tdb";
+const REBUILD: &str = "Rebuild the library (shows the plan first)";
+
+#[test]
+fn rebuild_shows_a_plan_and_writes_nothing_until_confirmed() {
+    let mut run = load(music);
+    let before = walk(run._card.path());
+    let out = answer(&mut run, REBUILD);
+    let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+    assert_eq!(v["Choice"]["name"], "confirm");
+    let log = run.log.lock().unwrap().clone();
+    assert!(log.contains("3 tracks in 2 albums"), "{log}");
+    assert_eq!(walk(run._card.path()), before, "the plan wrote something");
+    let out = answer_to(&mut run, "confirm", "Cancel, write nothing");
+    assert!(out.contains("\"main\""));
+    assert_eq!(walk(run._card.path()), before, "cancel wrote something");
+}
+
+#[test]
+fn confirming_writes_the_same_library_as_the_native_build() {
+    let mut run = load(music);
+    answer(&mut run, REBUILD);
+    answer_to(&mut run, "confirm", "Write the library now");
+    let log = run.log.lock().unwrap().clone();
+    assert!(log.contains("Library written: 3 tracks, 2 albums"), "{log}");
+    let wasm = fs::read(run._card.path().join(INDEX)).expect("the plugin wrote the index");
+    // The same music, built natively: the WebAssembly build must give the same bytes.
+    let native = tempfile::tempdir().unwrap();
+    music(native.path());
+    tps_core::rebuild::run(native.path()).unwrap();
+    assert_eq!(wasm, fs::read(native.path().join(INDEX)).unwrap());
+    // The music itself was not touched.
+    let tracks: Vec<_> = walk(run._card.path())
+        .into_iter()
+        .filter(|e| e.contains(".mp3"))
+        .collect();
+    assert_eq!(tracks.len(), 3);
+}
+
+#[test]
+fn rebuild_without_a_tau_folder_says_so_and_writes_nothing() {
+    let mut run = load(|_| {});
+    let out = answer(&mut run, REBUILD);
+    assert!(out.contains("\"main\""), "back to the menu");
+    assert!(
+        run.log
+            .lock()
+            .unwrap()
+            .contains("There is no Assets/tau/common folder")
+    );
+    assert!(walk(run._card.path()).is_empty());
 }
