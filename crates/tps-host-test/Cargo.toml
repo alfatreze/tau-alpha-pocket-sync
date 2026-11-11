@@ -1,0 +1,16 @@
+[package]
+name = "tps-host-test"
+description = "Runs the compiled plugin under Extism with a disposable card and host folder (the same mounts the real hosts give it)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dev-dependencies]
+extism = "1.21.0"
+serde_json = "1"
+tempfile = "3"
+
+[lints]
+workspace = true

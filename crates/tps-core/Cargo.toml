@@ -1,0 +1,16 @@
+[package]
+name = "tps-core"
+description = "TAU card logic for the Pocket Sync plugin: scan, classify, report. Pure Rust, no host or WASM dependencies."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde_json = "1"
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints]
+workspace = true

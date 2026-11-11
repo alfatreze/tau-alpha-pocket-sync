@@ -1,0 +1,28 @@
+name: release
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip1
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test -p tps-core
+      - run: cargo build -p tps-plugin --target wasm32-wasip1 --release --locked
+      - run: cargo test -p tps-host-test
+      - name: Collect the two files a plugin release needs
+        run: |
+          mkdir out
+          cp target/wasm32-wasip1/release/tps_plugin.wasm out/plugin.wasm
+          cp crates/tps-plugin/plugin.json out/plugin.json
+          (cd out && sha256sum plugin.wasm plugin.json > SHA256SUMS.txt && cat SHA256SUMS.txt)
+      - name: Publish (the release title is the version the hosts compare)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "$GITHUB_REF_NAME" out/plugin.wasm out/plugin.json out/SHA256SUMS.txt --title "$GITHUB_REF_NAME" --generate-notes

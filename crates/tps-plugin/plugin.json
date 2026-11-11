@@ -1,0 +1,5 @@
+{
+  "name": "TAU Library",
+  "description": "Check a card for TAU (Analogue Pocket music player): what plays, what does not, what is missing. Early version; library rebuild and cover sidecars are coming.",
+  "allowed_hosts": []
+}
