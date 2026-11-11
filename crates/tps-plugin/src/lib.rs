@@ -3,7 +3,7 @@
 
 use extism_pdk::*;
 use serde::Serialize;
-use tps_core::{Limits, rebuild, report, scan};
+use tps_core::{Limits, covers, rebuild, report, scan};
 
 #[derive(Clone, Serialize, ToBytes)]
 #[encoding(Json)]
@@ -48,6 +48,8 @@ use host::{open, say};
 const CARD: &str = "pocket";
 const CHECK: &str = "Check the card (read only)";
 const REBUILD: &str = "Rebuild the library (shows the plan first)";
+const COVERS: &str = "Make album covers (shows the plan first)";
+const WRITE_COVERS: &str = "Make the covers now";
 const WRITE: &str = "Write the library now";
 const CANCEL: &str = "Cancel, write nothing";
 const OMEGA: &str = "Get Tau Omega (the full tool)";
@@ -57,7 +59,13 @@ fn menu(query: &str) -> PluginMessage {
     PluginMessage::Choice {
         name: "main".into(),
         query: query.into(),
-        choices: vec![CHECK.into(), REBUILD.into(), OMEGA.into(), EXIT.into()],
+        choices: vec![
+            CHECK.into(),
+            REBUILD.into(),
+            COVERS.into(),
+            OMEGA.into(),
+            EXIT.into(),
+        ],
     }
 }
 
@@ -88,6 +96,9 @@ pub fn handle_response(Json(msg): Json<serde_json::Value>) -> FnResult<PluginMes
     if asked == "confirm" {
         return Ok(confirmed(value));
     }
+    if asked == "confirm-covers" {
+        return Ok(covers_confirmed(value));
+    }
     match value {
         CHECK => {
             say("Scanning the card...");
@@ -97,6 +108,7 @@ pub fn handle_response(Json(msg): Json<serde_json::Value>) -> FnResult<PluginMes
             Ok(menu("Anything else?"))
         }
         REBUILD => Ok(rebuild_plan()),
+        COVERS => Ok(covers_plan()),
         OMEGA => {
             open(report::TAU_OMEGA_URL)?;
             Ok(menu("Anything else?"))
@@ -153,6 +165,52 @@ fn confirmed(value: &str) -> PluginMessage {
             say(report::OMEGA_NUDGE);
         }
         Err(e) => say(&format!("The library was not changed by this step: {e}")),
+    }
+    menu("Anything else?")
+}
+
+/// Reads the folders and shows which albums would get a cover file; nothing is written.
+fn covers_plan() -> PluginMessage {
+    say("Looking for albums without a cover file (nothing is written yet)...");
+    match covers::plan(std::path::Path::new(CARD)) {
+        Ok(p) => {
+            say(&covers::render_plan(&p));
+            if p.to_make.is_empty() {
+                say("Nothing to make.");
+                menu("Anything else?")
+            } else {
+                PluginMessage::Choice {
+                    name: "confirm-covers".into(),
+                    query: "Make these cover files now?".into(),
+                    choices: vec![WRITE_COVERS.into(), CANCEL.into()],
+                }
+            }
+        }
+        Err(e) => {
+            say(&e.to_string());
+            menu("Anything else?")
+        }
+    }
+}
+
+fn covers_confirmed(value: &str) -> PluginMessage {
+    if value != WRITE_COVERS {
+        say("Nothing was written.");
+        return menu("Anything else?");
+    }
+    say("Making the cover files. Please keep the card in place...");
+    let mut progress = |done: usize, total: usize| {
+        if done == total || done % 10 == 0 {
+            say(&format!("  {done} of {total}"));
+        }
+    };
+    match covers::run(std::path::Path::new(CARD), &mut progress) {
+        Ok(d) => {
+            say(&covers::render_done(&d));
+            say("Eject the card from your computer before you take it out.");
+            say(report::OMEGA_NUDGE);
+        }
+        Err(e) => say(&format!("The covers were not changed by this step: {e}")),
     }
     menu("Anything else?")
 }

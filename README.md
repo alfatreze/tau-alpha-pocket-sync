@@ -2,7 +2,7 @@
 
 A small plugin for [Pocket Sync](https://github.com/neil-morrison44/pocket-sync) and pupdate that looks after the music side of a card used with **TAU**, the music player core for the Analogue Pocket ([Tau-Alpha](https://github.com/alfatreze/Tau-Alpha)).
 
-> **Status: early, not released.** It has two functions: **Check the card** (read only) and **Rebuild the library** (shows a plan first and writes only after you say yes). The cover sidecars are the next step (see [`docs/PLAN.md`](docs/PLAN.md)). Tested on disposable cards under the plugin host; not tried yet in the real Pocket Sync or pupdate.
+> **Status: early, not released.** It has three functions: **Check the card** (read only), **Rebuild the library** and **Make album covers** (both show a plan first and write only after you say yes). See [`docs/PLAN.md`](docs/PLAN.md) for what comes next. Tested on disposable cards under the plugin host; not tried yet in the real Pocket Sync or pupdate.
 
 ## What "Check the card" tells you
 * whether TAU is installed (and which version) and whether `Assets/tau/common` exists;
@@ -15,6 +15,9 @@ A small plugin for [Pocket Sync](https://github.com/neil-morrison44/pocket-sync)
 
 ## What "Rebuild the library" does
 It reads the tags of the MP3 and FLAC files under `Assets/tau/common` and writes `tau-library.tdb` (the index TAU lists) and, when names need it, the name sidecar (`tau-names.json` and `tau-names.bin`, the original text behind the Pocket-safe names). It shows the plan first (tracks, albums, playlists, files it must leave out) and asks. The old library stays until the new one has been written, read back and checked. **Your music files are never renamed, moved or deleted**; a file the Pocket cannot open (a character outside code page 437, or a path over 200 bytes) is left out and listed. The index and the sidecar are made by [Tau Omega](https://github.com/alfatreze/Tau-Omega)'s `tau-core`, so the plugin and Tau Omega write the same format.
+
+## What "Make album covers" does
+TAU shows an album's cover from a small file, `<album>/tau-art/cover_128.pal256.timg`. Without it the player decodes the album's JPEG on every track change, which takes seconds. The plugin finds the albums that have no such file, shows which picture each would be made from (the folder's `cover.jpg` / `folder.png` / similar, or the art inside the first track that has some), and after you confirm writes the files: a temp file, read back and checked, then renamed. It never replaces an existing cover file and never changes your pictures or your music. Albums with no picture at all are listed and left alone. Afterwards it rebuilds the library (if there is one), because the index tells the player which albums have a cover file.
 
 ## Use it
 Releases are not published yet. When they are, add `https://github.com/alfatreze/tau-alpha-pocket-sync` as a plugin repository in Pocket Sync (Plugins), connect your card and run **TAU Library**. The same plugin format is meant to work in pupdate (not tested yet).

@@ -115,6 +115,7 @@ fn start_shows_the_menu() {
         [
             "Check the card (read only)",
             "Rebuild the library (shows the plan first)",
+            "Make album covers (shows the plan first)",
             "Get Tau Omega (the full tool)",
             "Exit"
         ]
@@ -299,4 +300,58 @@ fn rebuild_without_a_tau_folder_says_so_and_writes_nothing() {
             .contains("There is no Assets/tau/common folder")
     );
     assert!(walk(run._card.path()).is_empty());
+}
+
+// ---- Album covers ----
+
+fn jpeg(w: u16, h: u16) -> Vec<u8> {
+    let data: Vec<u8> = (0..h)
+        .flat_map(|y| (0..w).flat_map(move |x| [(x * 4) as u8, 200, (y * 4) as u8]))
+        .collect();
+    let mut out = Vec::new();
+    jpeg_encoder::Encoder::new(&mut out, 90)
+        .encode(&data, w, h, jpeg_encoder::ColorType::Rgb)
+        .unwrap();
+    out
+}
+
+fn music_with_covers(card: &Path) {
+    music(card);
+    fs::write(
+        card.join("Assets/tau/common/Album One/cover.jpg"),
+        jpeg(64, 48),
+    )
+    .unwrap();
+}
+
+const COVERS: &str = "Make album covers (shows the plan first)";
+const SIDECAR: &str = "Assets/tau/common/Album One/tau-art/cover_128.pal256.timg";
+
+#[test]
+fn covers_show_a_plan_and_write_nothing_until_confirmed() {
+    let mut run = load(music_with_covers);
+    let before = walk(run._card.path());
+    let out = answer(&mut run, COVERS);
+    let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+    assert_eq!(v["Choice"]["name"], "confirm-covers");
+    let log = run.log.lock().unwrap().clone();
+    assert!(log.contains("1 would get one"), "{log}");
+    assert!(log.contains("1 albums have no picture"), "{log}");
+    assert_eq!(walk(run._card.path()), before);
+    answer_to(&mut run, "confirm-covers", "Cancel, write nothing");
+    assert_eq!(walk(run._card.path()), before);
+}
+
+#[test]
+fn confirming_makes_the_same_cover_as_the_native_build() {
+    let mut run = load(music_with_covers);
+    answer(&mut run, COVERS);
+    answer_to(&mut run, "confirm-covers", "Make the covers now");
+    let log = run.log.lock().unwrap().clone();
+    assert!(log.contains("Cover files written: 1"), "{log}");
+    let wasm = fs::read(run._card.path().join(SIDECAR)).expect("the plugin wrote the cover");
+    let native = tempfile::tempdir().unwrap();
+    music_with_covers(native.path());
+    tps_core::covers::run(native.path(), &mut |_, _| {}).unwrap();
+    assert_eq!(wasm, fs::read(native.path().join(SIDECAR)).unwrap());
 }
