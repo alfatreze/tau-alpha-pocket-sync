@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.1.0 (first release)
+- A plugin icon (`assets/plugin-icon.png`, 480 px), shown by the hosts from `logo_url`.
 - **Check the card** (read only): is TAU installed, how many tracks, albums and playlists it can see, whether the library index, the name sidecar and the album cover files are there, which files TAU cannot play, macOS stubs.
 - **Rebuild the library**: reads the tags of the MP3 and FLAC files under `Assets/tau/common` and writes `tau-library.tdb` and, when names need it, the name sidecar. Shows a plan first and asks. The old library stays until the new one is checked. Files the Pocket cannot open are left out and listed. The index is made by Tau Omega's `tau-core`.
 - **Make album covers**: writes `<album>/tau-art/cover_128.pal256.timg` for albums that have none, from the folder picture or the art inside a track. Shows a plan first and asks. Never replaces an existing cover file; rebuilds the library afterwards.

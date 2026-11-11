@@ -1,5 +1,7 @@
 # TAU Library: a Pocket Sync / pupdate plugin for TAU
 
+<img src="assets/plugin-icon.png" alt="TAU Library plugin icon" width="120" align="right">
+
 A small plugin for [Pocket Sync](https://github.com/neil-morrison44/pocket-sync) and pupdate that looks after the music side of a card used with **TAU**, the music player core for the Analogue Pocket ([Tau-Alpha](https://github.com/alfatreze/Tau-Alpha)).
 
 > **Status: first release, early.** It has three functions: **Check the card** (read only), **Rebuild the library** and **Make album covers** (both show a plan first and write only after you say yes). See [`docs/PLAN.md`](docs/PLAN.md) for what comes next. Tested on disposable cards under the plugin host; not tried yet in the real Pocket Sync or pupdate.
