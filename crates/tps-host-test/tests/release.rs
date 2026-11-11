@@ -15,7 +15,9 @@ fn plugin_json_has_a_name_a_description_and_a_logo_at_this_version() {
     assert!(!v["name"].as_str().unwrap().is_empty());
     assert!(v["description"].as_str().unwrap().len() > 40);
     assert!(v["allowed_hosts"].as_array().unwrap().is_empty());
-    let url = v["logo_url"].as_str().expect("plugin.json needs a logo_url");
+    let url = v["logo_url"]
+        .as_str()
+        .expect("plugin.json needs a logo_url");
     let want = format!(
         "https://raw.githubusercontent.com/alfatreze/tau-alpha-pocket-sync/v{}/assets/plugin-icon.png",
         env!("CARGO_PKG_VERSION")
