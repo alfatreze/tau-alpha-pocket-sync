@@ -5,6 +5,7 @@
 
 pub mod covers;
 pub mod library;
+pub mod names;
 pub mod rebuild;
 pub mod report;
 pub mod scan;

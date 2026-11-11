@@ -78,7 +78,11 @@ fn plan_counts_and_writes_nothing() {
     let p = plan(dir.path()).unwrap();
     assert_eq!((p.tracks, p.albums, p.current_tracks), (3, 2, None));
     assert!(!dir.path().join(MEDIA_ROOT).join(INDEX_NAME).exists());
-    assert!(render_plan(&p).contains("3 tracks in 2 albums"));
+    assert!(
+        plan_lines(&p, false)
+            .join("\n")
+            .contains("none -> 3 tracks, 2 albums")
+    );
 }
 
 #[test]
@@ -122,7 +126,11 @@ fn names_the_pocket_cannot_open_are_left_out_and_listed() {
     let p = plan(dir.path()).unwrap();
     assert_eq!(p.tracks, 3);
     assert_eq!(p.unreachable.len(), 1);
-    assert!(render_plan(&p).contains("cannot open"));
+    assert!(
+        plan_lines(&p, false)
+            .join("\n")
+            .contains("name the Pocket can't open")
+    );
     assert_eq!(run(dir.path()).unwrap().tracks, 3);
 }
 

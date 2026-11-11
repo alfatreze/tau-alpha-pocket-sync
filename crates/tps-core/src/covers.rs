@@ -155,46 +155,29 @@ pub fn run(card: &Path, progress: &mut dyn FnMut(usize, usize)) -> Result<Done, 
     })
 }
 
-pub fn render_plan(p: &Plan) -> String {
+/// The plan as short lines (the caller adds the heading).
+pub fn plan_lines(p: &Plan) -> Vec<String> {
     use crate::report::plural;
-    let mut o = String::from("ALBUM COVERS\n");
-    o.push_str(&format!(
-        "  {}: {} already have a cover file, {} would get one\n",
-        plural(p.albums as u64, "album", "albums"),
-        p.have,
-        p.to_make.len()
-    ));
-    for (folder, from) in p.to_make.iter().take(5) {
-        o.push_str(&format!("      - {folder}  <-  {from}\n"));
-    }
-    if p.to_make.len() > 5 {
-        o.push_str(&format!("      - ... and {} more\n", p.to_make.len() - 5));
+    let mut o = Vec::new();
+    if p.to_make.is_empty() {
+        o.push("Covers    all there".into());
+    } else {
+        o.push(format!("Covers    {} to make", p.to_make.len()));
     }
     if !p.no_picture.is_empty() {
-        o.push_str(&format!(
-            "  ! {} no picture to make one from (nothing is made for them)\n",
+        o.push(format!(
+            "! {} no picture: skipped",
             plural(p.no_picture.len() as u64, "album has", "albums have")
         ));
-        for f in p.no_picture.iter().take(5) {
-            o.push_str(&format!("      - {f}\n"));
-        }
-        if p.no_picture.len() > 5 {
-            o.push_str(&format!(
-                "      - ... and {} more\n",
-                p.no_picture.len() - 5
-            ));
-        }
     }
     o
 }
 
 pub fn render_done(d: &Done) -> String {
-    let mut o = format!("  Covers: {} written\n", d.written);
+    let mut o = format!("  Covers    {} written\n", d.written);
     o.push_str(&render_failed(&d.failed));
     if let Some(n) = d.library_tracks {
-        o.push_str(&format!(
-            "  The library was rebuilt so the player sees them ({n} tracks).\n"
-        ));
+        o.push_str(&format!("  Library   rebuilt ({n} tracks)\n"));
     }
     o
 }
@@ -202,10 +185,10 @@ pub fn render_done(d: &Done) -> String {
 pub(crate) fn render_failed(failed: &[(String, String)]) -> String {
     let mut o = String::new();
     for (f, e) in failed.iter().take(5) {
-        o.push_str(&format!("  ! not made for {f}: {e}\n"));
+        o.push_str(&format!("  ! no cover for {f}: {e}\n"));
     }
     if failed.len() > 5 {
-        o.push_str(&format!("  ! ... and {} more not made\n", failed.len() - 5));
+        o.push_str(&format!("  ! ... and {} more\n", failed.len() - 5));
     }
     o
 }

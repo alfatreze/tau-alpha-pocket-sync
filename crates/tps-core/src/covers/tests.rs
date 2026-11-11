@@ -100,9 +100,9 @@ fn the_plan_names_each_album_and_writes_nothing() {
             .count(),
         before
     );
-    let text = render_plan(&p);
+    let text = plan_lines(&p).join("\n");
     assert!(
-        text.contains("2 would get one") && text.contains("ALBUM COVERS"),
+        text.contains("2 to make") && text.contains("1 album has no picture"),
         "{text}"
     );
 }
@@ -160,7 +160,7 @@ fn an_existing_library_is_rebuilt_after_the_covers() {
     rebuild::run(dir.path()).unwrap();
     let d = run(dir.path(), &mut |_, _| {}).unwrap();
     assert_eq!(d.library_tracks, Some(4));
-    assert!(render_done(&d).contains("library was rebuilt"));
+    assert!(render_done(&d).contains("Library   rebuilt"));
 }
 
 #[test]

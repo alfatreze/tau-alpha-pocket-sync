@@ -35,6 +35,9 @@ pub struct Plan {
     pub notes: Vec<String>,
     /// The library on the card now: tracks in it, or `None` when there is none or it does not parse.
     pub current_tracks: Option<u16>,
+    /// The library on the card is exactly what a rebuild would write now (index and name sidecar), so nothing needs
+    /// writing for the library itself.
+    pub up_to_date: bool,
 }
 
 /// What a rebuild did.
@@ -134,6 +137,34 @@ fn current_tracks(root: &Path) -> Option<u16> {
     parse(&bytes).ok().map(|ix| ix.counts.tracks)
 }
 
+/// Whether the index on the card is byte for byte what a rebuild would write, and the name sidecar is there exactly when
+/// it is needed. Any problem building it counts as "not current" (the run then reports the problem).
+fn is_current(root: &Path, s: &Selection) -> bool {
+    if s.entries.is_empty() {
+        return false;
+    }
+    let Ok((index, names)) =
+        tau_core::build_index_with_names(&s.entries, &s.playlists, &s.prefix, &mut Vec::new())
+    else {
+        return false;
+    };
+    if fs::read(root.join(INDEX_NAME)).ok().as_deref() != Some(index.as_slice()) {
+        return false;
+    }
+    let Ok(ix) = parse(&index) else { return false };
+    let counts = (
+        usize::from(ix.counts.tracks),
+        usize::from(ix.counts.albums),
+        usize::from(ix.counts.artists),
+    );
+    let Ok(side) = name_sidecar::build_sidecar(ix.build_id, &names, &BTreeMap::new(), counts)
+    else {
+        return false;
+    };
+    // Current unless a sidecar is needed and missing (one that is there stays: it may hold originals of renamed files).
+    root.join(JSON_NAME).is_file() || side.is_empty()
+}
+
 /// Reads the tags and says what a rebuild would do. Writes nothing.
 pub fn plan(card: &Path) -> Result<Plan, Error> {
     let root = media_root(card)?;
@@ -147,7 +178,9 @@ pub fn plan(card: &Path) -> Result<Plan, Error> {
                 && (e.tags.contains_key("TPE1") || e.tags.contains_key("TPE2")))
         })
         .count();
+    let up_to_date = is_current(&root, &s);
     Ok(Plan {
+        up_to_date,
         tracks: s.entries.len(),
         albums: albums.len(),
         playlists: s.playlists.len(),
@@ -244,68 +277,54 @@ fn swap_in(root: &Path, index: &[u8]) -> Result<(), Error> {
 /// The generated files a rebuild owns (for tests and the report).
 pub const GENERATED: [&str; 3] = [INDEX_NAME, JSON_NAME, BIN_NAME];
 
-/// Plain text for the plan (same conventions as the Check text: short lines, `!` for something to know, `-` for a list).
-pub fn render_plan(p: &Plan) -> String {
+/// The plan as short lines (the caller adds the heading). `skip_names` leaves out the "can't open" line, for when the
+/// caller offers to rename those files instead.
+pub fn plan_lines(p: &Plan, skip_names: bool) -> Vec<String> {
     use crate::report::plural;
-    let mut o = String::from("LIBRARY\n");
-    o.push_str(&format!(
-        "  Now on the card:   {}\n",
-        match p.current_tracks {
+    let mut o = Vec::new();
+    if p.up_to_date {
+        o.push("Library   up to date".into());
+    } else {
+        let now = match p.current_tracks {
             Some(n) => plural(u64::from(n), "track", "tracks"),
-            None => "no library (or unreadable)".into(),
-        }
-    ));
-    o.push_str(&format!(
-        "  After the rebuild: {} in {}, {}\n",
-        plural(p.tracks as u64, "track", "tracks"),
-        plural(p.albums as u64, "album", "albums"),
-        plural(p.playlists as u64, "playlist", "playlists")
-    ));
-    if p.missing_tags > 0 {
-        o.push_str(&format!(
-            "  ! {} no title or artist tag (the file name is used)\n",
-            plural(p.missing_tags as u64, "track has", "tracks have")
+            None => "none".into(),
+        };
+        o.push(format!(
+            "Library   {now} -> {}, {}",
+            plural(p.tracks as u64, "track", "tracks"),
+            plural(p.albums as u64, "album", "albums")
         ));
     }
-    for (title, list) in [
-        ("left out: the Pocket cannot open the name", &p.unreachable),
-        ("left out: the path is over 200 bytes", &p.too_long),
-    ] {
-        if !list.is_empty() {
-            o.push_str(&format!(
-                "  ! {} {title}\n",
-                plural(list.len() as u64, "file", "files")
-            ));
-            for f in list.iter().take(5) {
-                o.push_str(&format!("      - {f}\n"));
-            }
-            if list.len() > 5 {
-                o.push_str(&format!("      - ... and {} more\n", list.len() - 5));
-            }
-        }
+    if !skip_names && !p.unreachable.is_empty() {
+        o.push(format!(
+            "! {} left out: name the Pocket can't open",
+            plural(p.unreachable.len() as u64, "file", "files")
+        ));
     }
-    for n in &p.notes {
-        o.push_str(&format!("  - {n}\n"));
+    if !p.too_long.is_empty() {
+        o.push(format!(
+            "! {} left out: path over 200 bytes",
+            plural(p.too_long.len() as u64, "file", "files")
+        ));
     }
     o
 }
 
-pub fn render_done(d: &Done) -> String {
+/// What was written, as short lines.
+pub fn done_lines(d: &Done) -> Vec<String> {
     use crate::report::plural;
-    format!(
-        "  Library: {}, {}, {} ({} bytes)\n  Name sidecar: {}\n",
+    let mut o = vec![format!(
+        "Library   {}, {}",
         plural(d.tracks as u64, "track", "tracks"),
-        plural(d.albums as u64, "album", "albums"),
-        plural(d.playlists as u64, "playlist", "playlists"),
-        d.index_bytes,
-        if d.name_removed {
-            "none needed (removed an old one)".to_string()
-        } else if d.name_records == 0 {
-            "none needed".to_string()
-        } else {
-            format!("{} records", d.name_records)
-        }
-    )
+        plural(d.albums as u64, "album", "albums")
+    )];
+    if d.name_records > 0 {
+        o.push(format!(
+            "Names     {} kept",
+            plural(d.name_records as u64, "original", "originals")
+        ));
+    }
+    o
 }
 
 #[cfg(test)]

@@ -1,5 +1,5 @@
-//! `cargo run -p tps-core --example rebuild -- <card folder> [--write]`: the plugin's rebuild on a folder, for the golden
-//! comparison against `tools/tau_library.py` (the plan is printed; with `--write` the library is written).
+//! `cargo run -p tps-core --example rebuild -- <card folder> [--write]`: the plugin's rebuild on a folder (the plan is
+//! printed; with `--write` the library and covers are written, no renames).
 use std::path::Path;
 
 fn main() {
@@ -9,16 +9,16 @@ fn main() {
         std::process::exit(2);
     };
     let card = Path::new(card);
-    match tps_core::rebuild::plan(card) {
-        Ok(p) => print!("{}", tps_core::rebuild::render_plan(&p)),
+    match tps_core::library::plan(card) {
+        Ok(p) => print!("{}", tps_core::library::render_plan(&p)),
         Err(e) => {
             eprintln!("{e}");
             std::process::exit(1);
         }
     }
     if args.iter().any(|a| a == "--write") {
-        match tps_core::rebuild::run(card) {
-            Ok(d) => print!("{}", tps_core::rebuild::render_done(&d)),
+        match tps_core::library::run(card, &mut |_, _| {}, None) {
+            Ok(d) => print!("{}", tps_core::library::render_done(&d)),
             Err(e) => {
                 eprintln!("{e}");
                 std::process::exit(1);

@@ -116,14 +116,11 @@ fn report_text_covers_the_important_cases() {
     touch(c, "Assets/tau/common/X/1.mp3");
     touch(c, "Assets/tau/common/X/2.wma");
     let t = crate::report::render(&scan(c, Limits::default()));
-    assert!(t.contains("! TAU core not found"));
-    assert!(t.contains("! Library index missing"));
-    assert!(t.contains("! Album covers: 0 of 1 have one"));
-    assert!(t.contains("! Not playable by TAU: 1 file (.wma 1)"));
-    assert!(
-        crate::report::render(&Report::default())
-            .contains("Music folder missing: Assets/tau/common")
-    );
+    assert!(t.contains("! TAU not installed"));
+    assert!(t.contains("! No library"));
+    assert!(t.contains("Covers    0 of 1"));
+    assert!(t.contains("! 1 file TAU can't play (.wma)"));
+    assert!(crate::report::render(&Report::default()).contains("No music folder"));
 }
 
 #[cfg(unix)]

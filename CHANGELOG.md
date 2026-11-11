@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+- **One Rebuild does it all, and only what is needed:** the library, the name sidecar and the album covers in one step with one plan. Nothing is written when everything is already up to date. **Make album covers only** is gone.
+- **Names the Pocket can't open** (letters outside code page 437) are no longer just skipped: you are asked whether to rename them (the original names are kept in the name sidecar, playlists are fixed, a backup goes to the plugin's host folder, never on the card) or skip those files.
+- **Shorter text** everywhere: the Check, the plan and the result are a few short lines under visible section rules (the host drops blank lines, so the spacing is drawn).
+
 ## 0.2.0
 - **Easier to read:** the Check text, the plans and the results are now laid out in sections (CARD, NEEDS DOING, OPTIONAL; LIBRARY, ALBUM COVERS; DONE) with short lines, `!` for a problem, and the menu item that fixes each problem named under it.
 - The Tau Omega item is now **↗ Get Tau Omega**.

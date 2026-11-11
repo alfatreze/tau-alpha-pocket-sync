@@ -3,7 +3,7 @@
 
 use extism_pdk::*;
 use serde::Serialize;
-use tps_core::{Limits, covers, library, report, scan};
+use tps_core::{Limits, library, report, scan};
 
 #[derive(Clone, Serialize, ToBytes)]
 #[encoding(Json)]
@@ -48,24 +48,25 @@ use host::{open, say};
 const CARD: &str = "pocket";
 const CHECK: &str = "Check the card (read only)";
 const REBUILD: &str = "Rebuild the library (shows the plan first)";
-const COVERS: &str = "Make album covers only (shows the plan first)";
-const WRITE_COVERS: &str = "Make the covers now";
-const WRITE: &str = "Write the library and covers now";
-const CANCEL: &str = "Cancel, write nothing";
+const WRITE: &str = "Write now";
+const SKIP: &str = "Skip those files and write";
+const CANCEL: &str = "Cancel";
+/// Where a rename keeps its backup: the plugin's private folder on the computer, never on the card.
+const BACKUP: &str = "host/tau-backups";
 const OMEGA: &str = "↗ Get Tau Omega";
 
 fn menu(query: &str) -> PluginMessage {
     PluginMessage::Choice {
         name: "main".into(),
         query: query.into(),
-        choices: vec![CHECK.into(), REBUILD.into(), COVERS.into(), OMEGA.into()],
+        choices: vec![CHECK.into(), REBUILD.into(), OMEGA.into()],
     }
 }
 
 #[plugin_fn]
 pub fn start() -> FnResult<PluginMessage> {
     say(&format!(
-        "TAU Library {}: reads the card; writes only when you say so, and only the library and cover files.",
+        "TAU Library {}. Nothing is written without your OK.",
         env!("CARGO_PKG_VERSION")
     ));
     Ok(menu("What do you want to do?"))
@@ -90,19 +91,15 @@ pub fn handle_response(Json(msg): Json<serde_json::Value>) -> FnResult<PluginMes
     if asked == "confirm" {
         return Ok(confirmed(value));
     }
-    if asked == "confirm-covers" {
-        return Ok(covers_confirmed(value));
-    }
     match value {
         CHECK => {
-            say("Scanning the card...");
+            say("Reading the card...");
             let r = scan(std::path::Path::new(CARD), Limits::default());
             say(&report::render(&r));
             say(report::OMEGA_NUDGE);
             Ok(menu("Anything else?"))
         }
         REBUILD => Ok(rebuild_plan()),
-        COVERS => Ok(covers_plan()),
         OMEGA => {
             open(report::TAU_OMEGA_URL)?;
             Ok(menu("Anything else?"))
@@ -111,27 +108,39 @@ pub fn handle_response(Json(msg): Json<serde_json::Value>) -> FnResult<PluginMes
     }
 }
 
-fn confirm_menu() -> PluginMessage {
+fn confirm_menu(renames: usize) -> PluginMessage {
+    let mut choices = Vec::new();
+    if renames > 0 {
+        choices.push(format!("Rename {renames} and write"));
+        choices.push(SKIP.to_string());
+    } else {
+        choices.push(WRITE.to_string());
+    }
+    choices.push(CANCEL.to_string());
     PluginMessage::Choice {
         name: "confirm".into(),
-        query: "Write the library now?".into(),
-        choices: vec![WRITE.into(), CANCEL.into()],
+        query: if renames > 0 {
+            "Rename them (originals are kept, a backup goes to the plugin's host folder)?".into()
+        } else {
+            "Write now?".into()
+        },
+        choices,
     }
 }
 
-/// Reads the tags and the folders and shows what a rebuild would do (the library and the album covers); nothing is written.
+/// Reads the tags, folders and names and shows what a rebuild would do; nothing is written.
 fn rebuild_plan() -> PluginMessage {
-    say("Reading the music, its tags and the album folders (nothing is written yet)...");
+    say("Reading the card...");
     match library::plan(std::path::Path::new(CARD)) {
         Ok(p) => {
             say(&library::render_plan(&p));
             if p.library.tracks == 0 {
-                say(
-                    "There is no playable track (MP3 or FLAC) to list, so there is nothing to write.",
-                );
+                say("No MP3 or FLAC to list.");
+                menu("Anything else?")
+            } else if p.nothing_to_do() {
                 menu("Anything else?")
             } else {
-                confirm_menu()
+                confirm_menu(p.renames.as_ref().map_or(0, |n| n.files.len()))
             }
         }
         Err(e) => {
@@ -141,71 +150,32 @@ fn rebuild_plan() -> PluginMessage {
     }
 }
 
-/// The answer to the confirmation: make the covers and write the library, or leave everything as it is.
+/// The answer to the confirmation. "Rename ..." renames the files the Pocket cannot open (with a backup), "Write now"
+/// and "Skip those files" leave them out, anything else writes nothing.
 fn confirmed(value: &str) -> PluginMessage {
-    if value != WRITE {
-        say("Nothing was written.");
+    let rename = value.starts_with("Rename ");
+    if !rename && value != WRITE && value != SKIP {
+        say("Nothing written.");
         return menu("Anything else?");
     }
-    say("Writing the covers and the library. Please keep the card in place...");
+    say("Writing. Keep the card in...");
     let mut progress = |done: usize, total: usize| {
         if done == total || done % 10 == 0 {
-            say(&format!("  cover {done} of {total}"));
+            say(&format!("  cover {done}/{total}"));
         }
     };
-    match library::run(std::path::Path::new(CARD), &mut progress) {
+    let backup = std::path::Path::new(BACKUP);
+    match library::run(
+        std::path::Path::new(CARD),
+        &mut progress,
+        rename.then_some(backup),
+    ) {
         Ok(d) => {
             say(&library::render_done(&d));
-            say("Eject the card from your computer before you take it out.");
+            say("Eject the card before removing it.");
             say(report::OMEGA_NUDGE);
         }
-        Err(e) => say(&format!("The library was not changed by this step: {e}")),
-    }
-    menu("Anything else?")
-}
-
-fn covers_plan() -> PluginMessage {
-    say("Looking for albums without a cover file (nothing is written yet)...");
-    match covers::plan(std::path::Path::new(CARD)) {
-        Ok(p) => {
-            say(&covers::render_plan(&p));
-            say("Existing cover files, your pictures and your music are never changed.");
-            if p.to_make.is_empty() {
-                say("Nothing to make.");
-                menu("Anything else?")
-            } else {
-                PluginMessage::Choice {
-                    name: "confirm-covers".into(),
-                    query: "Make these cover files now?".into(),
-                    choices: vec![WRITE_COVERS.into(), CANCEL.into()],
-                }
-            }
-        }
-        Err(e) => {
-            say(&e.to_string());
-            menu("Anything else?")
-        }
-    }
-}
-
-fn covers_confirmed(value: &str) -> PluginMessage {
-    if value != WRITE_COVERS {
-        say("Nothing was written.");
-        return menu("Anything else?");
-    }
-    say("Making the cover files. Please keep the card in place...");
-    let mut progress = |done: usize, total: usize| {
-        if done == total || done % 10 == 0 {
-            say(&format!("  {done} of {total}"));
-        }
-    };
-    match covers::run(std::path::Path::new(CARD), &mut progress) {
-        Ok(d) => {
-            say(&covers::render_done(&d));
-            say("Eject the card from your computer before you take it out.");
-            say(report::OMEGA_NUDGE);
-        }
-        Err(e) => say(&format!("The covers were not changed by this step: {e}")),
+        Err(e) => say(&format!("Failed: {e}")),
     }
     menu("Anything else?")
 }

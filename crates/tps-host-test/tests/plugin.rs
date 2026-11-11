@@ -115,7 +115,6 @@ fn start_shows_the_menu() {
         [
             "Check the card (read only)",
             "Rebuild the library (shows the plan first)",
-            "Make album covers only (shows the plan first)",
             "↗ Get Tau Omega"
         ]
     );
@@ -123,7 +122,7 @@ fn start_shows_the_menu() {
         run.log
             .lock()
             .unwrap()
-            .contains("writes only when you say so")
+            .contains("Nothing is written without your OK")
     );
 }
 
@@ -136,16 +135,10 @@ fn check_reports_the_card_and_nudges_to_omega() {
     let out = answer(&mut run, "Check the card (read only)");
     assert!(out.contains("Choice"), "the menu comes back");
     let log = run.log.lock().unwrap().clone();
-    assert!(
-        log.contains("1 track (1 MP3, 0 FLAC)") && log.contains("1 album, 0 playlists"),
-        "{log}"
-    );
-    assert!(log.contains("! Library index missing"), "{log}");
-    assert!(
-        log.contains("! Not playable by TAU: 1 file (.m4a 1)"),
-        "{log}"
-    );
-    assert!(log.contains("Tau Omega does the rest"), "{log}");
+    assert!(log.contains("1 track (1 MP3, 0 FLAC), 1 album"), "{log}");
+    assert!(log.contains("! No library"), "{log}");
+    assert!(log.contains("! 1 file TAU can't play (.m4a)"), "{log}");
+    assert!(log.contains("Get Tau Omega"), "{log}");
 }
 
 #[test]
@@ -257,9 +250,9 @@ fn rebuild_shows_a_plan_and_writes_nothing_until_confirmed() {
     let v: serde_json::Value = serde_json::from_str(&out).unwrap();
     assert_eq!(v["Choice"]["name"], "confirm");
     let log = run.log.lock().unwrap().clone();
-    assert!(log.contains("3 tracks in 2 albums"), "{log}");
+    assert!(log.contains("none -> 3 tracks, 2 albums"), "{log}");
     assert_eq!(walk(run._card.path()), before, "the plan wrote something");
-    let out = answer_to(&mut run, "confirm", "Cancel, write nothing");
+    let out = answer_to(&mut run, "confirm", "Cancel");
     assert!(out.contains("\"main\""));
     assert_eq!(walk(run._card.path()), before, "cancel wrote something");
 }
@@ -268,9 +261,9 @@ fn rebuild_shows_a_plan_and_writes_nothing_until_confirmed() {
 fn confirming_writes_the_same_library_as_the_native_build() {
     let mut run = load(music);
     answer(&mut run, REBUILD);
-    answer_to(&mut run, "confirm", "Write the library and covers now");
+    answer_to(&mut run, "confirm", "Write now");
     let log = run.log.lock().unwrap().clone();
-    assert!(log.contains("Library: 3 tracks, 2 albums"), "{log}");
+    assert!(log.contains("Library   3 tracks, 2 albums"), "{log}");
     let wasm = fs::read(run._card.path().join(INDEX)).expect("the plugin wrote the index");
     // The same music, built natively: the WebAssembly build must give the same bytes.
     let native = tempfile::tempdir().unwrap();
@@ -321,37 +314,7 @@ fn music_with_covers(card: &Path) {
     .unwrap();
 }
 
-const COVERS: &str = "Make album covers only (shows the plan first)";
 const SIDECAR: &str = "Assets/tau/common/Album One/tau-art/cover_128.pal256.timg";
-
-#[test]
-fn covers_show_a_plan_and_write_nothing_until_confirmed() {
-    let mut run = load(music_with_covers);
-    let before = walk(run._card.path());
-    let out = answer(&mut run, COVERS);
-    let v: serde_json::Value = serde_json::from_str(&out).unwrap();
-    assert_eq!(v["Choice"]["name"], "confirm-covers");
-    let log = run.log.lock().unwrap().clone();
-    assert!(log.contains("1 would get one"), "{log}");
-    assert!(log.contains("1 album has no picture"), "{log}");
-    assert_eq!(walk(run._card.path()), before);
-    answer_to(&mut run, "confirm-covers", "Cancel, write nothing");
-    assert_eq!(walk(run._card.path()), before);
-}
-
-#[test]
-fn confirming_makes_the_same_cover_as_the_native_build() {
-    let mut run = load(music_with_covers);
-    answer(&mut run, COVERS);
-    answer_to(&mut run, "confirm-covers", "Make the covers now");
-    let log = run.log.lock().unwrap().clone();
-    assert!(log.contains("Covers: 1 written"), "{log}");
-    let wasm = fs::read(run._card.path().join(SIDECAR)).expect("the plugin wrote the cover");
-    let native = tempfile::tempdir().unwrap();
-    music_with_covers(native.path());
-    tps_core::covers::run(native.path(), &mut |_, _| {}).unwrap();
-    assert_eq!(wasm, fs::read(native.path().join(SIDECAR)).unwrap());
-}
 
 #[test]
 fn rebuild_includes_the_covers_and_matches_the_native_build() {
@@ -359,20 +322,82 @@ fn rebuild_includes_the_covers_and_matches_the_native_build() {
     answer(&mut run, REBUILD);
     let plan_log = run.log.lock().unwrap().clone();
     assert!(
-        plan_log.contains("1 would get one"),
+        plan_log.contains("1 to make"),
         "the plan names the covers: {plan_log}"
     );
-    answer_to(&mut run, "confirm", "Write the library and covers now");
+    answer_to(&mut run, "confirm", "Write now");
     let log = run.log.lock().unwrap().clone();
-    assert!(log.contains("Library: 3 tracks"), "{log}");
-    assert!(log.contains("Covers: 1 written"), "{log}");
+    assert!(log.contains("Library   3 tracks"), "{log}");
+    assert!(log.contains("Covers    1 written"), "{log}");
     let (wasm_cover, wasm_index) = (
         fs::read(run._card.path().join(SIDECAR)).unwrap(),
         fs::read(run._card.path().join(INDEX)).unwrap(),
     );
     let native = tempfile::tempdir().unwrap();
     music_with_covers(native.path());
-    tps_core::library::run(native.path(), &mut |_, _| {}).unwrap();
+    tps_core::library::run(native.path(), &mut |_, _| {}, None).unwrap();
     assert_eq!(wasm_cover, fs::read(native.path().join(SIDECAR)).unwrap());
     assert_eq!(wasm_index, fs::read(native.path().join(INDEX)).unwrap());
+}
+
+#[test]
+fn a_name_the_pocket_cannot_open_can_be_renamed_with_a_backup_in_the_host_folder() {
+    let mut run = load(|c| {
+        music(c);
+        fs::write(
+            c.join("Assets/tau/common/Album One/Łódź.mp3"),
+            mp3("Lodz", "Ann", "Album One"),
+        )
+        .unwrap();
+    });
+    let out = answer(&mut run, REBUILD);
+    let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+    let choices: Vec<String> = v["Choice"]["choices"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c.as_str().unwrap().to_string())
+        .collect();
+    assert_eq!(
+        choices,
+        ["Rename 1 and write", "Skip those files and write", "Cancel"]
+    );
+    let log = run.log.lock().unwrap().clone();
+    assert!(log.contains("1 file name can't be opened"), "{log}");
+    answer_to(&mut run, "confirm", "Rename 1 and write");
+    let log = run.log.lock().unwrap().clone();
+    assert!(log.contains("Renamed   1 name"), "{log}");
+    let card = run._card.path().join("Assets/tau/common/Album One");
+    assert!(card.join("Lódz.mp3").is_file() && !card.join("Łódź.mp3").exists());
+    assert!(
+        fs::read_dir(run._host.path().join("tau-backups"))
+            .unwrap()
+            .count()
+            > 0,
+        "the backup is in the host folder"
+    );
+    assert!(
+        !walk(run._card.path())
+            .iter()
+            .any(|e| e.contains("tau-backups")),
+        "no backup on the card"
+    );
+}
+
+#[test]
+fn skipping_leaves_the_file_alone() {
+    let mut run = load(|c| {
+        music(c);
+        fs::write(
+            c.join("Assets/tau/common/Album One/Łódź.mp3"),
+            mp3("Lodz", "Ann", "Album One"),
+        )
+        .unwrap();
+    });
+    answer(&mut run, REBUILD);
+    answer_to(&mut run, "confirm", "Skip those files and write");
+    let card = run._card.path().join("Assets/tau/common/Album One");
+    assert!(card.join("Łódź.mp3").is_file());
+    assert!(fs::read(run._card.path().join(INDEX)).is_ok());
+    assert!(run.log.lock().unwrap().contains("Library   3 tracks"));
 }
