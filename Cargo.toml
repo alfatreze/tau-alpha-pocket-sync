@@ -6,7 +6,7 @@ resolver = "2"
 version = "0.1.0"
 edition = "2024"
 license = "MIT"
-repository = "https://github.com/alfatreze/tau-pocket-sync"
+repository = "https://github.com/alfatreze/tau-alpha-pocket-sync"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

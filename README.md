@@ -14,7 +14,7 @@ A small plugin for [Pocket Sync](https://github.com/neil-morrison44/pocket-sync)
 * macOS stubs (`._*`, `.DS_Store`).
 
 ## Use it
-Releases are not published yet. When they are, add `https://github.com/alfatreze/tau-pocket-sync` as a plugin repository in Pocket Sync (Plugins), connect your card and run **TAU Library**. The same plugin format is meant to work in pupdate (not tested yet).
+Releases are not published yet. When they are, add `https://github.com/alfatreze/tau-alpha-pocket-sync` as a plugin repository in Pocket Sync (Plugins), connect your card and run **TAU Library**. The same plugin format is meant to work in pupdate (not tested yet).
 
 ## Want more? Tau Omega
 This plugin stays small on purpose (a plugin cannot run external tools). **[Tau Omega](https://github.com/alfatreze/Tau-Omega)** does the rest: converts any format to MP3 or FLAC for TAU, edits tags and covers, keeps ReplayGain right, builds playlists, installs and updates TAU and your meter presets, and checks the whole card. Free, for Mac, Windows and Linux. The plugin has a menu item that opens its download page.
