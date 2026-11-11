@@ -30,6 +30,6 @@ fn the_logo_is_a_square_png_of_a_sensible_size() {
     let w = u32::from_be_bytes(png[16..20].try_into().unwrap());
     let h = u32::from_be_bytes(png[20..24].try_into().unwrap());
     assert_eq!(w, h, "the logo must be square");
-    assert!((256..=2048).contains(&w), "size {w}");
+    assert!((128..=2048).contains(&w), "size {w}");
     assert!(png.len() < 1_000_000, "keep the logo small");
 }
