@@ -244,53 +244,59 @@ fn swap_in(root: &Path, index: &[u8]) -> Result<(), Error> {
 /// The generated files a rebuild owns (for tests and the report).
 pub const GENERATED: [&str; 3] = [INDEX_NAME, JSON_NAME, BIN_NAME];
 
-/// Plain text for the plan.
+/// Plain text for the plan (same conventions as the Check text: short lines, `!` for something to know, `-` for a list).
 pub fn render_plan(p: &Plan) -> String {
-    let mut o = String::new();
+    use crate::report::plural;
+    let mut o = String::from("LIBRARY\n");
     o.push_str(&format!(
-        "Library on the card now: {}\n",
+        "  Now on the card:   {}\n",
         match p.current_tracks {
-            Some(n) => format!("{n} tracks"),
-            None => "none (or unreadable)".into(),
+            Some(n) => plural(u64::from(n), "track", "tracks"),
+            None => "no library (or unreadable)".into(),
         }
     ));
     o.push_str(&format!(
-        "A rebuild would list: {} tracks in {} albums, {} playlists\n",
-        p.tracks, p.albums, p.playlists
+        "  After the rebuild: {} in {}, {}\n",
+        plural(p.tracks as u64, "track", "tracks"),
+        plural(p.albums as u64, "album", "albums"),
+        plural(p.playlists as u64, "playlist", "playlists")
     ));
     if p.missing_tags > 0 {
         o.push_str(&format!(
-            "  {} tracks have no title or artist tag (the file name is used)\n",
-            p.missing_tags
+            "  ! {} no title or artist tag (the file name is used)\n",
+            plural(p.missing_tags as u64, "track has", "tracks have")
         ));
     }
     for (title, list) in [
-        (
-            "left out: the Pocket cannot open these names",
-            &p.unreachable,
-        ),
-        ("left out: path over 200 bytes", &p.too_long),
+        ("left out: the Pocket cannot open the name", &p.unreachable),
+        ("left out: the path is over 200 bytes", &p.too_long),
     ] {
         if !list.is_empty() {
-            o.push_str(&format!("  {} {title}\n", list.len()));
+            o.push_str(&format!(
+                "  ! {} {title}\n",
+                plural(list.len() as u64, "file", "files")
+            ));
             for f in list.iter().take(5) {
-                o.push_str(&format!("    {f}\n"));
+                o.push_str(&format!("      - {f}\n"));
+            }
+            if list.len() > 5 {
+                o.push_str(&format!("      - ... and {} more\n", list.len() - 5));
             }
         }
     }
     for n in &p.notes {
-        o.push_str(&format!("  note: {n}\n"));
+        o.push_str(&format!("  - {n}\n"));
     }
-    o.push_str("Your music files are never renamed, moved or deleted.\n");
     o
 }
 
 pub fn render_done(d: &Done) -> String {
+    use crate::report::plural;
     format!(
-        "Library written: {} tracks, {} albums, {} playlists ({} bytes). Name sidecar: {}.\n",
-        d.tracks,
-        d.albums,
-        d.playlists,
+        "  Library: {}, {}, {} ({} bytes)\n  Name sidecar: {}\n",
+        plural(d.tracks as u64, "track", "tracks"),
+        plural(d.albums as u64, "album", "albums"),
+        plural(d.playlists as u64, "playlist", "playlists"),
         d.index_bytes,
         if d.name_removed {
             "none needed (removed an old one)".to_string()

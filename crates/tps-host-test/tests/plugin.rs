@@ -116,7 +116,7 @@ fn start_shows_the_menu() {
             "Check the card (read only)",
             "Rebuild the library (shows the plan first)",
             "Make album covers only (shows the plan first)",
-            "Get Tau Omega (the full tool)"
+            "↗ Get Tau Omega"
         ]
     );
     assert!(
@@ -137,12 +137,12 @@ fn check_reports_the_card_and_nudges_to_omega() {
     assert!(out.contains("Choice"), "the menu comes back");
     let log = run.log.lock().unwrap().clone();
     assert!(
-        log.contains("Music: 1 tracks (1 MP3, 0 FLAC) in 1 album folders"),
+        log.contains("1 track (1 MP3, 0 FLAC)") && log.contains("1 album, 0 playlists"),
         "{log}"
     );
-    assert!(log.contains("Library index: MISSING"), "{log}");
+    assert!(log.contains("! Library index missing"), "{log}");
     assert!(
-        log.contains("Not playable by TAU: 1 files (.m4a 1)"),
+        log.contains("! Not playable by TAU: 1 file (.m4a 1)"),
         "{log}"
     );
     assert!(log.contains("Tau Omega does the rest"), "{log}");
@@ -179,7 +179,7 @@ fn walk(root: &Path) -> Vec<String> {
 #[test]
 fn omega_item_opens_the_releases_page() {
     let mut run = load(|_| {});
-    answer(&mut run, "Get Tau Omega (the full tool)");
+    answer(&mut run, "↗ Get Tau Omega");
     assert_eq!(
         run.urls.lock().unwrap().as_slice(),
         ["https://github.com/alfatreze/Tau-Omega/releases/latest"]
@@ -270,7 +270,7 @@ fn confirming_writes_the_same_library_as_the_native_build() {
     answer(&mut run, REBUILD);
     answer_to(&mut run, "confirm", "Write the library and covers now");
     let log = run.log.lock().unwrap().clone();
-    assert!(log.contains("Library written: 3 tracks, 2 albums"), "{log}");
+    assert!(log.contains("Library: 3 tracks, 2 albums"), "{log}");
     let wasm = fs::read(run._card.path().join(INDEX)).expect("the plugin wrote the index");
     // The same music, built natively: the WebAssembly build must give the same bytes.
     let native = tempfile::tempdir().unwrap();
@@ -333,7 +333,7 @@ fn covers_show_a_plan_and_write_nothing_until_confirmed() {
     assert_eq!(v["Choice"]["name"], "confirm-covers");
     let log = run.log.lock().unwrap().clone();
     assert!(log.contains("1 would get one"), "{log}");
-    assert!(log.contains("1 albums have no picture"), "{log}");
+    assert!(log.contains("1 album has no picture"), "{log}");
     assert_eq!(walk(run._card.path()), before);
     answer_to(&mut run, "confirm-covers", "Cancel, write nothing");
     assert_eq!(walk(run._card.path()), before);
@@ -345,7 +345,7 @@ fn confirming_makes_the_same_cover_as_the_native_build() {
     answer(&mut run, COVERS);
     answer_to(&mut run, "confirm-covers", "Make the covers now");
     let log = run.log.lock().unwrap().clone();
-    assert!(log.contains("Cover files written: 1"), "{log}");
+    assert!(log.contains("Covers: 1 written"), "{log}");
     let wasm = fs::read(run._card.path().join(SIDECAR)).expect("the plugin wrote the cover");
     let native = tempfile::tempdir().unwrap();
     music_with_covers(native.path());
@@ -364,8 +364,8 @@ fn rebuild_includes_the_covers_and_matches_the_native_build() {
     );
     answer_to(&mut run, "confirm", "Write the library and covers now");
     let log = run.log.lock().unwrap().clone();
-    assert!(log.contains("Library written: 3 tracks"), "{log}");
-    assert!(log.contains("Cover files written: 1"), "{log}");
+    assert!(log.contains("Library: 3 tracks"), "{log}");
+    assert!(log.contains("Covers: 1 written"), "{log}");
     let (wasm_cover, wasm_index) = (
         fs::read(run._card.path().join(SIDECAR)).unwrap(),
         fs::read(run._card.path().join(INDEX)).unwrap(),

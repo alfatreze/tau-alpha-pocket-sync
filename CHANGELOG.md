@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
+- **Easier to read:** the Check text, the plans and the results are now laid out in sections (CARD, NEEDS DOING, OPTIONAL; LIBRARY, ALBUM COVERS; DONE) with short lines, `!` for a problem, and the menu item that fixes each problem named under it.
+- The Tau Omega item is now **↗ Get Tau Omega**.
 - **Rebuild the library now also makes the album covers**: one plan, one confirmation; the covers are made first, then the library is written once. **Make album covers only** stays for when only the covers are missing.
 - The **Exit** item is gone (the host's window stays open until you close it).
 

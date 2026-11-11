@@ -156,43 +156,56 @@ pub fn run(card: &Path, progress: &mut dyn FnMut(usize, usize)) -> Result<Done, 
 }
 
 pub fn render_plan(p: &Plan) -> String {
-    let mut o = format!(
-        "{} albums: {} already have a cover file, {} would get one\n",
-        p.albums,
+    use crate::report::plural;
+    let mut o = String::from("ALBUM COVERS\n");
+    o.push_str(&format!(
+        "  {}: {} already have a cover file, {} would get one\n",
+        plural(p.albums as u64, "album", "albums"),
         p.have,
         p.to_make.len()
-    );
+    ));
     for (folder, from) in p.to_make.iter().take(5) {
-        o.push_str(&format!("    {folder}  <-  {from}\n"));
+        o.push_str(&format!("      - {folder}  <-  {from}\n"));
     }
     if p.to_make.len() > 5 {
-        o.push_str(&format!("    ... and {} more\n", p.to_make.len() - 5));
+        o.push_str(&format!("      - ... and {} more\n", p.to_make.len() - 5));
     }
     if !p.no_picture.is_empty() {
         o.push_str(&format!(
-            "  {} albums have no picture to make one from (nothing is made for them)\n",
-            p.no_picture.len()
+            "  ! {} no picture to make one from (nothing is made for them)\n",
+            plural(p.no_picture.len() as u64, "album has", "albums have")
         ));
         for f in p.no_picture.iter().take(5) {
-            o.push_str(&format!("    {f}\n"));
+            o.push_str(&format!("      - {f}\n"));
+        }
+        if p.no_picture.len() > 5 {
+            o.push_str(&format!(
+                "      - ... and {} more\n",
+                p.no_picture.len() - 5
+            ));
         }
     }
-    o.push_str("Existing cover files, your pictures and your music are never changed.\n");
     o
 }
 
 pub fn render_done(d: &Done) -> String {
-    let mut o = format!("Cover files written: {}\n", d.written);
-    for (f, e) in d.failed.iter().take(5) {
-        o.push_str(&format!("  not made for {f}: {e}\n"));
-    }
-    if d.failed.len() > 5 {
-        o.push_str(&format!("  ... and {} more not made\n", d.failed.len() - 5));
-    }
+    let mut o = format!("  Covers: {} written\n", d.written);
+    o.push_str(&render_failed(&d.failed));
     if let Some(n) = d.library_tracks {
         o.push_str(&format!(
-            "The library was rebuilt so the player sees them ({n} tracks).\n"
+            "  The library was rebuilt so the player sees them ({n} tracks).\n"
         ));
+    }
+    o
+}
+
+pub(crate) fn render_failed(failed: &[(String, String)]) -> String {
+    let mut o = String::new();
+    for (f, e) in failed.iter().take(5) {
+        o.push_str(&format!("  ! not made for {f}: {e}\n"));
+    }
+    if failed.len() > 5 {
+        o.push_str(&format!("  ! ... and {} more not made\n", failed.len() - 5));
     }
     o
 }

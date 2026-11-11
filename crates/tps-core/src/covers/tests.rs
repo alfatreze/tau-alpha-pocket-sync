@@ -102,7 +102,7 @@ fn the_plan_names_each_album_and_writes_nothing() {
     );
     let text = render_plan(&p);
     assert!(
-        text.contains("2 would get one") && text.contains("never changed"),
+        text.contains("2 would get one") && text.contains("ALBUM COVERS"),
         "{text}"
     );
 }

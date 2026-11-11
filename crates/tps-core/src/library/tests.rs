@@ -80,7 +80,7 @@ fn one_run_writes_the_covers_and_the_library_and_the_library_knows_the_covers() 
     assert!(!c.join("No Picture/tau-art").exists());
     let text = render_done(&d);
     assert!(
-        text.contains("Library written: 2 tracks") && text.contains("Cover files written: 1"),
+        text.contains("Library: 2 tracks") && text.contains("Covers: 1 written"),
         "{text}"
     );
     // Nothing is left to do: a second run writes no cover and gives the same library bytes.
@@ -103,7 +103,7 @@ fn a_bad_picture_does_not_stop_the_library() {
         (d.covers_written, d.covers_failed.len(), d.library.tracks),
         (0, 1, 2)
     );
-    assert!(render_done(&d).contains("not made for With Picture"));
+    assert!(render_done(&d).contains("! not made for With Picture"));
 }
 
 #[test]

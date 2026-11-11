@@ -52,7 +52,7 @@ const COVERS: &str = "Make album covers only (shows the plan first)";
 const WRITE_COVERS: &str = "Make the covers now";
 const WRITE: &str = "Write the library and covers now";
 const CANCEL: &str = "Cancel, write nothing";
-const OMEGA: &str = "Get Tau Omega (the full tool)";
+const OMEGA: &str = "↗ Get Tau Omega";
 
 fn menu(query: &str) -> PluginMessage {
     PluginMessage::Choice {
@@ -65,7 +65,7 @@ fn menu(query: &str) -> PluginMessage {
 #[plugin_fn]
 pub fn start() -> FnResult<PluginMessage> {
     say(&format!(
-        "TAU Library {}: reads the card; writes only when you say so, and only the library files.",
+        "TAU Library {}: reads the card; writes only when you say so, and only the library and cover files.",
         env!("CARGO_PKG_VERSION")
     ));
     Ok(menu("What do you want to do?"))
@@ -169,6 +169,7 @@ fn covers_plan() -> PluginMessage {
     match covers::plan(std::path::Path::new(CARD)) {
         Ok(p) => {
             say(&covers::render_plan(&p));
+            say("Existing cover files, your pictures and your music are never changed.");
             if p.to_make.is_empty() {
                 say("Nothing to make.");
                 menu("Anything else?")

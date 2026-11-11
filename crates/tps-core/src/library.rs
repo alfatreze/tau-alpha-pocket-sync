@@ -47,24 +47,17 @@ pub fn run(card: &Path, progress: &mut dyn FnMut(usize, usize)) -> Result<Done, 
 
 pub fn render_plan(p: &Plan) -> String {
     format!(
-        "{}{}",
+        "{}\n{}\nYour music files are never renamed, moved or deleted.\n",
         rebuild::render_plan(&p.library),
         covers::render_plan(&p.covers)
     )
 }
 
 pub fn render_done(d: &Done) -> String {
-    let mut o = rebuild::render_done(&d.library);
-    o.push_str(&format!("Cover files written: {}\n", d.covers_written));
-    for (f, e) in d.covers_failed.iter().take(5) {
-        o.push_str(&format!("  not made for {f}: {e}\n"));
-    }
-    if d.covers_failed.len() > 5 {
-        o.push_str(&format!(
-            "  ... and {} more not made\n",
-            d.covers_failed.len() - 5
-        ));
-    }
+    let mut o = String::from("DONE\n");
+    o.push_str(&rebuild::render_done(&d.library));
+    o.push_str(&format!("  Covers: {} written\n", d.covers_written));
+    o.push_str(&covers::render_failed(&d.covers_failed));
     o
 }
 
