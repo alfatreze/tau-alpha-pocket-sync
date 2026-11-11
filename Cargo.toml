@@ -19,4 +19,4 @@ strip = true
 
 [workspace.dependencies]
 # Omega's engine, pinned to a tag (Omega message 016/017, decision D-023): the one index builder, shared with Tau Omega.
-tau-core = { git = "https://github.com/alfatreze/Tau-Omega", tag = "tau-core-wasm-1" }
+tau-core = { git = "https://github.com/alfatreze/Tau-Omega", tag = "tau-core-wasm-2" }
