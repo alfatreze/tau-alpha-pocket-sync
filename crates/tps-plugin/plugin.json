@@ -1,5 +1,5 @@
 {
   "name": "TAU Library",
-  "description": "Check a card for TAU (Analogue Pocket music player): what plays, what does not, what is missing. Early version; library rebuild and cover sidecars are coming.",
+  "description": "Looks after the music on your TAU card (the Analogue Pocket music player): checks what plays, rebuilds the library from the files on the card, and makes the album cover files. Shows a plan first and writes only after you confirm; your music is never renamed, moved or deleted.",
   "allowed_hosts": []
 }

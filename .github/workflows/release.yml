@@ -16,13 +16,21 @@ jobs:
       - run: cargo test -p tps-core
       - run: cargo build -p tps-plugin --target wasm32-wasip1 --release --locked
       - run: cargo test -p tps-host-test
-      - name: Collect the two files a plugin release needs
+      - name: Collect the two files a plugin release needs (exactly these two, as the plugin hosts expect)
         run: |
           mkdir out
           cp target/wasm32-wasip1/release/tps_plugin.wasm out/plugin.wasm
           cp crates/tps-plugin/plugin.json out/plugin.json
-          (cd out && sha256sum plugin.wasm plugin.json > SHA256SUMS.txt && cat SHA256SUMS.txt)
+          (cd out && sha256sum plugin.wasm plugin.json | tee ../sums.txt)
+          {
+            awk -v v="${GITHUB_REF_NAME#v}" 'index($0,"## " v " ")==1{on=1;next} /^## /{on=0} on' CHANGELOG.md
+            echo
+            echo '**SHA-256 of the two files:**'
+            echo '```'
+            cat sums.txt
+            echo '```'
+          } > notes.md
       - name: Publish (the release title is the version the hosts compare)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release create "$GITHUB_REF_NAME" out/plugin.wasm out/plugin.json out/SHA256SUMS.txt --title "$GITHUB_REF_NAME" --generate-notes
+        run: gh release create "$GITHUB_REF_NAME" out/plugin.wasm out/plugin.json --title "$GITHUB_REF_NAME" --notes-file notes.md
