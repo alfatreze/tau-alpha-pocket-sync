@@ -133,3 +133,72 @@ fn symlinks_are_never_followed() {
     std::os::unix::fs::symlink(outside.path(), d.path().join("Assets/tau/common/link")).unwrap();
     assert_eq!(scan(d.path(), Limits::default()).tracks(), 0);
 }
+
+fn settings(c: &Path, core: &str, bytes: &[u8]) {
+    let p = c.join(format!("Saves/tau/{core}/tau-meter-settings.bin"));
+    fs::create_dir_all(p.parent().unwrap()).unwrap();
+    fs::write(p, bytes).unwrap();
+}
+
+/// A valid 8,192-byte settings file with `version` in the header of generation B (bytes 4096..4100 are the magic `TMSF`).
+fn settings_file(version: u16) -> Vec<u8> {
+    let mut b = vec![0u8; 8192];
+    b[4096..4100].copy_from_slice(b"TMSF");
+    b[4100..4102].copy_from_slice(&version.to_le_bytes());
+    b
+}
+
+#[test]
+fn no_settings_file_is_normal() {
+    let d = tempfile::tempdir().unwrap();
+    assert!(scan(d.path(), Limits::default()).settings_files.is_empty());
+}
+
+#[test]
+fn settings_file_states() {
+    let d = tempfile::tempdir().unwrap();
+    let c = d.path();
+    settings(c, "alfatreze.TAU", &settings_file(1));
+    assert_eq!(
+        scan(c, Limits::default()).settings_files,
+        vec![("TAU".to_string(), SettingsFile::Ok)]
+    );
+    settings(c, "alfatreze.TAU", &[0u8; 8191]);
+    assert_eq!(
+        scan(c, Limits::default()).settings_files,
+        vec![("TAU".to_string(), SettingsFile::WrongSize(8191))]
+    );
+    settings(c, "alfatreze.TAU", &[0u8; 8193]);
+    assert_eq!(
+        scan(c, Limits::default()).settings_files[0].1,
+        SettingsFile::WrongSize(8193)
+    );
+    settings(c, "alfatreze.TAU", &settings_file(2));
+    assert_eq!(
+        scan(c, Limits::default()).settings_files[0].1,
+        SettingsFile::NewerVersion,
+        "a version above 1 in the second generation counts"
+    );
+    settings(c, "alfatreze.TAU", &[0u8; 8192]);
+    assert_eq!(
+        scan(c, Limits::default()).settings_files[0].1,
+        SettingsFile::Ok,
+        "a zero file is fine: the Pocket loads it and TAU starts from defaults"
+    );
+}
+
+#[test]
+fn the_diagnostics_core_has_its_own_settings_file() {
+    let d = tempfile::tempdir().unwrap();
+    let c = d.path();
+    settings(c, "alfatreze.TAU", &settings_file(1));
+    settings(c, "alfatreze.TAU Diagnostics", &[0u8; 100]);
+    let r = scan(c, Limits::default());
+    assert_eq!(
+        r.settings_files,
+        vec![
+            ("TAU".to_string(), SettingsFile::Ok),
+            ("TAU Diagnostics".to_string(), SettingsFile::WrongSize(100))
+        ]
+    );
+}

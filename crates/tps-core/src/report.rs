@@ -1,6 +1,6 @@
 //! Plain-text rendering of a scan for the plugin's log window (one line per fact, no colour, no markup).
 
-use crate::scan::Report;
+use crate::scan::{Report, SETTINGS_FILE_BYTES, SETTINGS_FILES, SettingsFile};
 
 pub const TAU_OMEGA_URL: &str = "https://github.com/alfatreze/Tau-Omega/releases/latest";
 
@@ -71,6 +71,37 @@ pub fn render(r: &Report) -> String {
             ));
         }
     }
+    // The meter-settings file (TAU 0.7.5 and later). Missing is normal (the Pocket makes it at your first change); a file of another size stops TAU.
+    for (core, state) in &r.settings_files {
+        let rel = SETTINGS_FILES
+            .iter()
+            .find(|(c, _)| c == core)
+            .map(|(_, p)| *p)
+            .unwrap_or("");
+        let who = if core == "TAU" {
+            String::new()
+        } else {
+            format!("{core}: ")
+        };
+        match state {
+            SettingsFile::Ok => {
+                if core == "TAU" {
+                    card.push("Settings  meter settings file ok".into());
+                }
+            }
+            SettingsFile::NewerVersion => {
+                card.push(format!("Settings  {who}file is from a newer TAU: ignored"))
+            }
+            SettingsFile::WrongSize(n) => {
+                todo.push(format!(
+                    "! {who}settings file is {n} bytes, not {SETTINGS_FILE_BYTES}: TAU will not start"
+                ));
+                todo.push(format!(
+                    "  -> delete {rel} (computer or Pocket Sync's files); TAU makes a new one"
+                ));
+            }
+        }
+    }
     if r.junk > 0 {
         card.push(format!("Stubs     {} macOS junk files", r.junk));
     }
@@ -96,4 +127,74 @@ pub fn render(r: &Report) -> String {
         }
     }
     o
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn with(files: Vec<(&str, SettingsFile)>) -> String {
+        let r = Report {
+            tau_version: Some("0.7.5".into()),
+            media_root_found: true,
+            index_bytes: Some(1),
+            settings_files: files.into_iter().map(|(c, s)| (c.to_string(), s)).collect(),
+            ..Report::default()
+        };
+        render(&r)
+    }
+
+    #[test]
+    fn no_file_says_nothing_about_it() {
+        assert!(!with(vec![]).contains("ettings"));
+    }
+
+    #[test]
+    fn a_good_file_is_one_card_line() {
+        let t = with(vec![("TAU", SettingsFile::Ok)]);
+        assert!(t.contains("Settings  meter settings file ok"), "{t}");
+        assert!(!t.contains('!'), "{t}");
+    }
+
+    #[test]
+    fn a_wrong_size_says_tau_will_not_start_and_how_to_fix_it() {
+        let t = with(vec![("TAU", SettingsFile::WrongSize(8191))]);
+        assert!(
+            t.contains("! settings file is 8191 bytes, not 8192: TAU will not start"),
+            "{t}"
+        );
+        assert!(
+            t.contains("-> delete Saves/tau/alfatreze.TAU/tau-meter-settings.bin"),
+            "{t}"
+        );
+        assert!(t.contains("TO DO"), "{t}");
+    }
+
+    #[test]
+    fn the_diagnostics_file_is_named_only_when_it_has_a_problem() {
+        let ok = with(vec![
+            ("TAU", SettingsFile::Ok),
+            ("TAU Diagnostics", SettingsFile::Ok),
+        ]);
+        assert_eq!(ok.matches("Settings  ").count(), 1, "{ok}");
+        let bad = with(vec![("TAU Diagnostics", SettingsFile::WrongSize(5))]);
+        assert!(
+            bad.contains("! TAU Diagnostics: settings file is 5 bytes"),
+            "{bad}"
+        );
+        assert!(
+            bad.contains("alfatreze.TAU Diagnostics/tau-meter-settings.bin"),
+            "{bad}"
+        );
+    }
+
+    #[test]
+    fn a_newer_file_is_a_note_not_a_problem() {
+        let t = with(vec![("TAU", SettingsFile::NewerVersion)]);
+        assert!(
+            t.contains("Settings  file is from a newer TAU: ignored"),
+            "{t}"
+        );
+        assert!(t.contains("ALL GOOD"), "{t}");
+    }
 }

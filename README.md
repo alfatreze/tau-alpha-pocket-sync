@@ -11,6 +11,7 @@ A small plugin for [Pocket Sync](https://github.com/neil-morrison44/pocket-sync)
 * how many tracks, albums and playlists TAU can see (MP3 and FLAC are what TAU plays);
 * whether the library index (`tau-library.tdb`) is there; without it TAU shows an empty library;
 * whether the name sidecar (`tau-names`) is there;
+* TAU's meter-settings file (`Saves/tau/alfatreze.TAU/tau-meter-settings.bin`, TAU 0.7.5 and later): fine, or flagged when its size is wrong (the Pocket refuses it and TAU will not start until it is deleted);
 * which albums have no cover sidecar (`tau-art/cover_128.pal256.timg`; without one TAU decodes the embedded JPEG, which takes seconds per track);
 * files TAU cannot play (m4a, ogg, opus, wav, ...): listed and left alone;
 * macOS stubs (`._*`, `.DS_Store`).

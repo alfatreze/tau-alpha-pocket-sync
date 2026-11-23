@@ -142,6 +142,48 @@ fn check_reports_the_card_and_nudges_to_omega() {
 }
 
 #[test]
+fn check_warns_about_a_settings_file_the_pocket_would_refuse() {
+    let mut run = load(|c| {
+        touch(c, "Assets/tau/common/Album/01.mp3");
+        let p = c.join("Saves/tau/alfatreze.TAU/tau-meter-settings.bin");
+        fs::create_dir_all(p.parent().unwrap()).unwrap();
+        fs::write(p, vec![0u8; 8191]).unwrap();
+    });
+    answer(&mut run, "Check the card (read only)");
+    let log = run.log.lock().unwrap().clone();
+    assert!(
+        log.contains("! settings file is 8191 bytes, not 8192: TAU will not start"),
+        "{log}"
+    );
+    assert!(
+        log.contains("-> delete Saves/tau/alfatreze.TAU/tau-meter-settings.bin"),
+        "{log}"
+    );
+}
+
+#[test]
+fn check_is_quiet_about_a_good_settings_file_and_never_touches_it() {
+    let mut run = load(|c| {
+        touch(c, "Assets/tau/common/Album/01.mp3");
+        let p = c.join("Saves/tau/alfatreze.TAU/tau-meter-settings.bin");
+        fs::create_dir_all(p.parent().unwrap()).unwrap();
+        fs::write(p, vec![0u8; 8192]).unwrap();
+    });
+    let before = walk(run._card.path());
+    let file = run
+        ._card
+        .path()
+        .join("Saves/tau/alfatreze.TAU/tau-meter-settings.bin");
+    let bytes = fs::read(&file).unwrap();
+    answer(&mut run, "Check the card (read only)");
+    let log = run.log.lock().unwrap().clone();
+    assert!(log.contains("Settings  meter settings file ok"), "{log}");
+    assert!(!log.contains("TAU will not start"), "{log}");
+    assert_eq!(walk(run._card.path()), before);
+    assert_eq!(fs::read(&file).unwrap(), bytes);
+}
+
+#[test]
 fn the_card_is_never_written() {
     let mut run = load(|c| touch(c, "Assets/tau/common/A/1.mp3"));
     let before: Vec<_> = walk(run._card.path());

@@ -11,6 +11,29 @@ pub const COVER_SIDECAR: &str = "tau-art/cover_128.pal256.timg";
 /// The installed stable core's descriptor, relative to the card root.
 pub const CORE_JSON: &str = "Cores/alfatreze.TAU/core.json";
 
+/// The meter-settings file the Pocket writes for each TAU core (data slot 11, TAU 0.7.5 and later), relative to the card root. The Pocket creates it
+/// at the first change, so a missing file is normal. `(core label, path)`.
+pub const SETTINGS_FILES: [(&str, &str); 2] = [
+    ("TAU", "Saves/tau/alfatreze.TAU/tau-meter-settings.bin"),
+    (
+        "TAU Diagnostics",
+        "Saves/tau/alfatreze.TAU Diagnostics/tau-meter-settings.bin",
+    ),
+];
+/// The one size the Pocket accepts for it (`size_exact` in TAU's data.json).
+pub const SETTINGS_FILE_BYTES: u64 = 8192;
+
+/// What a settings file on the card is, as far as the Pocket and TAU are concerned.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SettingsFile {
+    /// 8,192 bytes, nothing odd in it.
+    Ok,
+    /// Any other size: the Pocket stops with "Error in framework file id [11] size bad" and TAU does not start until it is deleted.
+    WrongSize(u64),
+    /// 8,192 bytes with a format version newer than this plugin (and TAU 0.7.5) knows: TAU leaves it alone and keeps only two meters' settings.
+    NewerVersion,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Format {
     Mp3,
@@ -94,6 +117,8 @@ impl Default for Limits {
 pub struct Report {
     /// The installed stable TAU core's version, when the card has one.
     pub tau_version: Option<String>,
+    /// The settings files that exist, by core label (a missing file is normal and not listed).
+    pub settings_files: Vec<(String, SettingsFile)>,
     /// Whether `Assets/tau/common` exists.
     pub media_root_found: bool,
     pub mp3: u64,
@@ -134,6 +159,48 @@ fn push_example(list: &mut Vec<String>, rel: &str, cap: usize) {
     }
 }
 
+/// Looks at the meter-settings file of each TAU core: its size, and the version field of its two 4,096-byte generations (bytes 4 and 5 of each,
+/// after the magic `TMSF`). Reads at most 16 bytes of it; never writes.
+fn check_settings(card: &Path) -> Vec<(String, SettingsFile)> {
+    use std::io::{Read, Seek, SeekFrom};
+    let mut out = Vec::new();
+    for (core, rel) in SETTINGS_FILES {
+        let path = card.join(rel);
+        let Ok(meta) = fs::symlink_metadata(&path) else {
+            continue;
+        };
+        if !meta.is_file() {
+            continue;
+        }
+        if meta.len() != SETTINGS_FILE_BYTES {
+            out.push((core.to_string(), SettingsFile::WrongSize(meta.len())));
+            continue;
+        }
+        let mut newer = false;
+        if let Ok(mut f) = fs::File::open(&path) {
+            for bank in [0u64, 4096] {
+                let mut h = [0u8; 8];
+                if f.seek(SeekFrom::Start(bank)).is_ok()
+                    && f.read_exact(&mut h).is_ok()
+                    && &h[0..4] == b"TMSF"
+                    && u16::from_le_bytes([h[4], h[5]]) > 1
+                {
+                    newer = true;
+                }
+            }
+        }
+        out.push((
+            core.to_string(),
+            if newer {
+                SettingsFile::NewerVersion
+            } else {
+                SettingsFile::Ok
+            },
+        ));
+    }
+    out
+}
+
 /// Scans `card` (the card root). Never writes, never follows symlinks.
 pub fn scan(card: &Path, limits: Limits) -> Report {
     let mut r = Report::default();
@@ -145,6 +212,7 @@ pub fn scan(card: &Path, limits: Limits) -> Report {
                 .map(str::to_string);
         }
     }
+    r.settings_files = check_settings(card);
     let root = card.join(MEDIA_ROOT);
     if !root.is_dir() {
         return r;

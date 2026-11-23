@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.0
+- **Check now looks at TAU's meter-settings file** (TAU 0.7.5 and later keeps every meter's own settings in `Saves/tau/alfatreze.TAU/tau-meter-settings.bin`, and the Pocket makes and writes it by itself). A missing file is normal and says nothing. A good one adds a line, `Settings  meter settings file ok`. **A file of any other size than 8,192 bytes is flagged** (`! settings file is 8191 bytes, not 8192: TAU will not start`, with the file to delete): the Pocket refuses such a file with "Error in framework file id [11] size bad" and returns to the core list, and until it is deleted TAU cannot start. A file from a newer TAU is noted as ignored. TAU Diagnostics' own file is checked the same way and named only when something is wrong. Still read only: the plugin never writes, moves or deletes it.
+- No change to the library, names or covers, and none is needed for TAU 0.7.5 (the library format is the same).
+
 ## 0.3.0
 - **One Rebuild does it all, and only what is needed:** the library, the name sidecar and the album covers in one step with one plan. Nothing is written when everything is already up to date. **Make album covers only** is gone.
 - **Names the Pocket can't open** (letters outside code page 437) are no longer just skipped: you are asked whether to rename them (the original names are kept in the name sidecar, playlists are fixed, a backup goes to the plugin's host folder, never on the card) or skip those files.
